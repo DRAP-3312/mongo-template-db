@@ -25,6 +25,10 @@ jobs:
             PROJECT_DIR=~/workspace/mongo-template-db
             DEPLOY_DIR=$PROJECT_DIR/.deploy
             
+            # Ensure deploy directory exists and is clean
+            rm -rf $DEPLOY_DIR
+            mkdir -p $DEPLOY_DIR
+            
             # Create .env file from secrets on the server
             cat << EOF > $PROJECT_DIR/.env
             MONGO_ROOT_USERNAME=${{ secrets.MONGO_ROOT_USERNAME }}
@@ -34,6 +38,11 @@ jobs:
             CADDY_EMAIL=${{ secrets.CADDY_EMAIL }}
             MONGO_EXPRESS_USERNAME=${{ secrets.MONGO_EXPRESS_USERNAME }}
             MONGO_EXPRESS_PASSWORD=${{ secrets.MONGO_EXPRESS_PASSWORD }}
+            EOF
+            
+            # Create deploy-stack.yml on the server
+            cat << EOF > $DEPLOY_DIR/deploy-stack.yml
+            ${{ secrets.DEPLOY_STACK_CONTENT }}
             EOF
             
             # Navigate to the deploy directory
