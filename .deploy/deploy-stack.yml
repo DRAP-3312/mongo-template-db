@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7.0
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_DATABASE}
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - caddy
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+      labels:
+        caddy: "db.${DOMAIN}"
+        caddy.reverse_proxy: "{{upstreams 27017}}"
+        caddy.tls: "${CADDY_EMAIL}"
+
+volumes:
+  mongodb_data:
+    driver: local
+
+networks:
+  caddy:
+    external: true 
