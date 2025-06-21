@@ -23,11 +23,10 @@ jobs:
             
             # Define project directory
             PROJECT_DIR=~/workspace/mongo-template-db
-            DEPLOY_DIR=$PROJECT_DIR/.deploy
             
-            # Ensure deploy directory exists and is clean
-            rm -rf $DEPLOY_DIR
-            mkdir -p $DEPLOY_DIR
+            # Navigate to project directory and pull latest changes
+            cd $PROJECT_DIR
+            git pull
             
             # Create .env file from secrets on the server
             cat << EOF > $PROJECT_DIR/.env
@@ -40,66 +39,8 @@ jobs:
             MONGO_EXPRESS_PASSWORD=${{ secrets.MONGO_EXPRESS_PASSWORD }}
             EOF
             
-            # Create deploy-stack.yml on the server
-            cat << 'EOF' > $DEPLOY_DIR/deploy-stack.yml
-            version: '3.8'
-            
-            services:
-              mongodb:
-                image: mongo:7.0
-                environment:
-                  MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
-                  MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
-                  MONGO_INITDB_DATABASE: ${MONGO_DATABASE}
-                volumes:
-                  - mongodb_data:/data/db
-                networks:
-                  - mongodb_network
-                deploy:
-                  replicas: 1
-                  resources:
-                    limits:
-                      memory: 1G
-                    reservations:
-                      memory: 512M
-            
-              mongo-express:
-                image: mongo-express:latest
-                environment:
-                  ME_CONFIG_MONGODB_SERVER: mongodb
-                  ME_CONFIG_MONGODB_ENABLE_ADMIN: "true"
-                  ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_ROOT_USERNAME}
-                  ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_ROOT_PASSWORD}
-                  ME_CONFIG_MONGODB_AUTH_DATABASE: admin
-                  ME_CONFIG_BASICAUTH_USERNAME: ${MONGO_EXPRESS_USERNAME}
-                  ME_CONFIG_BASICAUTH_PASSWORD: ${MONGO_EXPRESS_PASSWORD}
-                networks:
-                  - mongodb_network
-                  - caddy
-                deploy:
-                  replicas: 1
-                labels:
-                  caddy: "${DOMAIN}"
-                  caddy.reverse_proxy: "{{upstreams 8081}}"
-                  caddy.tls: "${CADDY_EMAIL}"
-            
-            volumes:
-              mongodb_data:
-                driver: local
-            
-            networks:
-              mongodb_network:
-                driver: overlay
-                attachable: true
-              caddy:
-                external: true
-            EOF
-            
-            # Navigate to the deploy directory
-            cd $DEPLOY_DIR
-
-            # Load .env variables and deploy
+            # Load .env variables and deploy from the project folder
             set -a
             source $PROJECT_DIR/.env
             set +a
-            docker stack deploy --compose-file deploy-stack.yml mongodb --with-registry-auth
+            docker stack deploy --compose-file $PROJECT_DIR/.deploy/deploy-stack.yml mongodb --with-registry-auth
