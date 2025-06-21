@@ -35,6 +35,15 @@ jobs:
         source: ".deploy/deploy-stack.yml"
         target: "/home/${{ secrets.VPS_USER }}/workspace/mongo-template-db/"
         
+    - name: Copy mongo-express config to VPS
+      uses: appleboy/scp-action@v0.1.6
+      with:
+        host: ${{ secrets.VPS_HOST }}
+        username: ${{ secrets.VPS_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        source: ".deploy/mongo-express-config.js"
+        target: "/home/${{ secrets.VPS_USER }}/workspace/mongo-template-db/.deploy/"
+        
     - name: Deploy to VPS
       uses: appleboy/ssh-action@v1.0.0
       with:
