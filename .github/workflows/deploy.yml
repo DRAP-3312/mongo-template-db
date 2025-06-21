@@ -4,6 +4,13 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to deploy'
+        required: true
+        default: 'main'
+        type: string
 
 jobs:
   deploy:
@@ -11,6 +18,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch || github.ref }}
 
       - name: Deploy to VPS
         uses: appleboy/ssh-action@v1.0.3
@@ -21,6 +30,8 @@ jobs:
           script: |
             set -e
             
+            BRANCH_TO_DEPLOY=${{ github.event.inputs.branch || github.ref_name }}
+
             # Define project and repo details
             WORKSPACE_DIR=~/workspace
             PROJECT_DIR=$WORKSPACE_DIR/mongo-template-db
@@ -32,13 +43,15 @@ jobs:
             
             # Clone if project doesn't exist, or pull if it does
             if [ -d "$PROJECT_DIR/.git" ]; then
-              echo "Repository exists, pulling latest changes."
+              echo "Repository exists, fetching and resetting to branch ${BRANCH_TO_DEPLOY}."
               cd $PROJECT_DIR
-              git pull
+              git fetch origin
+              git checkout ${BRANCH_TO_DEPLOY}
+              git reset --hard origin/${BRANCH_TO_DEPLOY}
             else
-              echo "Repository not found, cloning."
+              echo "Repository not found, cloning branch ${BRANCH_TO_DEPLOY}."
               rm -rf $PROJECT_DIR
-              git clone $REPO_URL $PROJECT_DIR
+              git clone -b ${BRANCH_TO_DEPLOY} ${REPO_URL} ${PROJECT_DIR}
               cd $PROJECT_DIR
             fi
             
