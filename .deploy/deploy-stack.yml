@@ -18,6 +18,12 @@ services:
           memory: 1G
         reservations:
           memory: 512M
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh --quiet
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
 
   mongo-express:
     image: mongo-express:latest
@@ -25,18 +31,9 @@ services:
       ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_ROOT_USERNAME}
       ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_ROOT_PASSWORD}
       ME_CONFIG_MONGODB_SERVER: mongodb
-      ME_CONFIG_MONGODB_AUTH_DATABASE: admin
+      ME_CONFIG_MONGODB_ENABLE_ADMIN: "true"
       ME_CONFIG_BASICAUTH_USERNAME: ${MONGO_EXPRESS_USERNAME}
       ME_CONFIG_BASICAUTH_PASSWORD: ${MONGO_EXPRESS_PASSWORD}
-      ME_CONFIG_MONGODB_ENABLE_ADMIN: "true"
-      ME_CONFIG_MONGODB_AUTH_USERNAME: ${MONGO_ROOT_USERNAME}
-      ME_CONFIG_MONGODB_AUTH_PASSWORD: ${MONGO_ROOT_PASSWORD}
-      ME_CONFIG_MONGODB_PORT: "27017"
-      ME_CONFIG_MONGODB_URL: "mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongodb:27017/"
-    volumes:
-      - ./mongo-express-config.js:/app/config.js
-    depends_on:
-      - mongodb
     networks:
       - mongodb_network
       - caddy
@@ -46,6 +43,9 @@ services:
         caddy: "db.${DOMAIN}"
         caddy.reverse_proxy: "{{upstreams 8081}}"
         caddy.tls: "${CADDY_EMAIL}"
+    depends_on:
+      mongodb:
+        condition: service_healthy
 
 volumes:
   mongodb_data:
