@@ -56,7 +56,7 @@ jobs:
           ENVEOF
           
           echo ">>> Deploying MongoDB stack..."
-          docker stack deploy -c deploy-stack.yml mongodb
+          docker stack deploy -c .deploy/deploy-stack.yml mongodb
           
           echo ">>> Waiting for service update (10 seconds)..."
           sleep 10
