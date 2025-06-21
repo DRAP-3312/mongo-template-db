@@ -21,15 +21,29 @@ jobs:
           script: |
             set -e
             
-            # Define project directory
-            PROJECT_DIR=~/workspace/mongo-template-db
+            # Define project and repo details
+            WORKSPACE_DIR=~/workspace
+            PROJECT_DIR=$WORKSPACE_DIR/mongo-template-db
+            REPO_URL=https://github.com/DRAP-3312/mongo-template-db.git
             
-            # Navigate to project directory and pull latest changes
-            cd $PROJECT_DIR
-            git pull
+            # Ensure workspace directory exists
+            mkdir -p $WORKSPACE_DIR
+            cd $WORKSPACE_DIR
+            
+            # Clone if project doesn't exist, or pull if it does
+            if [ -d "$PROJECT_DIR/.git" ]; then
+              echo "Repository exists, pulling latest changes."
+              cd $PROJECT_DIR
+              git pull
+            else
+              echo "Repository not found, cloning."
+              rm -rf $PROJECT_DIR
+              git clone $REPO_URL $PROJECT_DIR
+              cd $PROJECT_DIR
+            fi
             
             # Create .env file from secrets on the server
-            cat << EOF > $PROJECT_DIR/.env
+            cat << EOF > .env
             MONGO_ROOT_USERNAME=${{ secrets.MONGO_ROOT_USERNAME }}
             MONGO_ROOT_PASSWORD=${{ secrets.MONGO_ROOT_PASSWORD }}
             MONGO_DATABASE=${{ secrets.MONGO_DATABASE }}
@@ -39,8 +53,8 @@ jobs:
             MONGO_EXPRESS_PASSWORD=${{ secrets.MONGO_EXPRESS_PASSWORD }}
             EOF
             
-            # Load .env variables and deploy from the project folder
+            # Load .env variables and deploy
             set -a
-            source $PROJECT_DIR/.env
+            source .env
             set +a
-            docker stack deploy --compose-file $PROJECT_DIR/.deploy/deploy-stack.yml mongodb --with-registry-auth
+            docker stack deploy --compose-file .deploy/deploy-stack.yml mongodb --with-registry-auth
