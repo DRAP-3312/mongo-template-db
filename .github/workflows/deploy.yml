@@ -42,6 +42,13 @@ jobs:
               cd $PROJECT_DIR
             fi
             
+            # Prepare combined certificate for MongoDB TLS from Caddy's certs
+            # This assumes Caddy is storing certs in the default location.
+            echo "Preparing MongoDB TLS certificate from Caddy..."
+            CADDY_CERT_PATH="/var/lib/caddy/.local/share/caddy/certificates/acme-v02.api.letsencrypt.org-directory/${DOMAIN}"
+            MONGO_CERT_TEMP_PATH="/tmp/mongodb.pem"
+            sudo cat "${CADDY_CERT_PATH}/${DOMAIN}.crt" "${CADDY_CERT_PATH}/${DOMAIN}.key" > $MONGO_CERT_TEMP_PATH
+            
             # Create .env file from secrets on the server
             cat << EOF > .env
             MONGO_ROOT_USERNAME=${{ secrets.MONGO_ROOT_USERNAME }}
