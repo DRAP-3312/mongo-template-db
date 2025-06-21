@@ -26,14 +26,14 @@ jobs:
         ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
         chmod 600 ~/.ssh/known_hosts
         
-    - name: Copy deploy-stack.yml to VPS
+    - name: Copy project files to VPS
       uses: appleboy/scp-action@v0.1.6
       with:
         host: ${{ secrets.VPS_HOST }}
         username: ${{ secrets.VPS_USER }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
-        source: ".deploy/deploy-stack.yml"
-        target: "/home/${{ secrets.VPS_USER }}/workspace/mongo-template-db/.deploy/"
+        source: ".deploy"
+        target: "/home/${{ secrets.VPS_USER }}/workspace/mongo-template-db/"
         
     - name: Deploy to VPS
       uses: appleboy/ssh-action@v1.0.0
@@ -42,11 +42,12 @@ jobs:
         username: ${{ secrets.VPS_USER }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         script: |
+          echo ">>> Preparing server for deployment..."
+          rm -rf /home/${{ secrets.VPS_USER }}/workspace/mongo-template-db
+          mkdir -p /home/${{ secrets.VPS_USER }}/workspace/mongo-template-db/.deploy
+          
           cd /home/${{ secrets.VPS_USER }}/workspace/mongo-template-db
           
-          echo ">>> Cleaning up old .env files..."
-          rm -f .env .deploy/.env
-
           echo ">>> Creating new .env file..."
           # Create .env file from secrets
           cat > .env << 'ENVEOF'
