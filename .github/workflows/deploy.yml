@@ -1,73 +1,46 @@
-name: Deploy MongoDB to VPS
+name: Deploy to VPS
 
 on:
   push:
-    branches: [ main ]
-  workflow_dispatch:
+    branches:
+      - main
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    
     steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v4
-      
-    - name: Install SSH Key
-      uses: webfactory/ssh-agent@v0.9.0
-      with:
-        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-        
-    - name: Add VPS to known_hosts
-      run: |
-        mkdir -p ~/.ssh
-        ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
-        chmod 600 ~/.ssh/known_hosts
-        
-    - name: Copy project files to VPS
-      uses: appleboy/scp-action@v0.1.6
-      with:
-        host: ${{ secrets.VPS_HOST }}
-        username: ${{ secrets.VPS_USER }}
-        key: ${{ secrets.SSH_PRIVATE_KEY }}
-        source: ".deploy"
-        target: "/home/${{ secrets.VPS_USER }}/workspace/mongo-template-db/"
-        
-    - name: Deploy to VPS
-      uses: appleboy/ssh-action@v1.0.0
-      with:
-        host: ${{ secrets.VPS_HOST }}
-        username: ${{ secrets.VPS_USER }}
-        key: ${{ secrets.SSH_PRIVATE_KEY }}
-        script: |
-          echo ">>> Preparing server for deployment..."
-          rm -rf /home/${{ secrets.VPS_USER }}/workspace/mongo-template-db
-          mkdir -p /home/${{ secrets.VPS_USER }}/workspace/mongo-template-db/.deploy
-          
-          cd /home/${{ secrets.VPS_USER }}/workspace/mongo-template-db
-          
-          echo ">>> Creating new .env file..."
-          # Create .env file from secrets
-          cat > .env << 'ENVEOF'
-          MONGO_ROOT_USERNAME=${{ secrets.MONGO_ROOT_USERNAME }}
-          MONGO_ROOT_PASSWORD=${{ secrets.MONGO_ROOT_PASSWORD }}
-          MONGO_DATABASE=${{ secrets.MONGO_DATABASE }}
-          MONGO_EXPRESS_USERNAME=${{ secrets.MONGO_EXPRESS_USERNAME }}
-          MONGO_EXPRESS_PASSWORD=${{ secrets.MONGO_EXPRESS_PASSWORD }}
-          DOMAIN=${{ secrets.DOMAIN }}
-          CADDY_EMAIL=${{ secrets.CADDY_EMAIL }}
-          ENVEOF
-          
-          echo ">>> Deploying MongoDB stack..."
-          set -a && source .env && set +a
-          docker stack deploy --compose-file .deploy/deploy-stack.yml mongodb
-          
-          echo ">>> Waiting for service update (10 seconds)..."
-          sleep 10
-          
-          echo ">>> Checking service status..."
-          docker service ls | grep mongodb
-          
-          echo ">>> MongoDB deployment completed successfully!" 
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -e
+            
+            # Define project directory
+            PROJECT_DIR=~/workspace/mongo-template-db
+            DEPLOY_DIR=$PROJECT_DIR/.deploy
+            
+            # Create .env file from secrets on the server
+            cat << EOF > $PROJECT_DIR/.env
+            MONGO_ROOT_USERNAME=${{ secrets.MONGO_ROOT_USERNAME }}
+            MONGO_ROOT_PASSWORD=${{ secrets.MONGO_ROOT_PASSWORD }}
+            MONGO_DATABASE=${{ secrets.MONGO_DATABASE }}
+            DOMAIN=${{ secrets.DOMAIN }}
+            CADDY_EMAIL=${{ secrets.CADDY_EMAIL }}
+            MONGO_EXPRESS_USERNAME=${{ secrets.MONGO_EXPRESS_USERNAME }}
+            MONGO_EXPRESS_PASSWORD=${{ secrets.MONGO_EXPRESS_PASSWORD }}
+            EOF
+            
+            # Navigate to the deploy directory
+            cd $DEPLOY_DIR
+
+            # Load .env variables and deploy
+            set -a
+            source $PROJECT_DIR/.env
+            set +a
+            docker stack deploy --compose-file deploy-stack.yml mongodb --with-registry-auth
