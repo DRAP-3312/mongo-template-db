@@ -2,7 +2,7 @@ name: Deploy MongoDB to VPS
 
 on:
   push:
-    branches: [ dev ]
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
