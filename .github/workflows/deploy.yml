@@ -60,6 +60,7 @@ jobs:
           ENVEOF
           
           echo ">>> Deploying MongoDB stack..."
+          set -a && source .env && set +a
           docker stack deploy --compose-file .deploy/deploy-stack.yml mongodb
           
           echo ">>> Waiting for service update (10 seconds)..."
