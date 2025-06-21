@@ -3,6 +3,8 @@ version: '3.8'
 services:
   mongodb:
     image: mongo:7.0
+    ports:
+      - "27017:27017"
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
@@ -19,24 +21,6 @@ services:
         reservations:
           memory: 512M
 
-  mongo-express:
-    image: mongo-express:latest
-    environment:
-      ME_CONFIG_MONGODB_URL: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongodb:27017/?authSource=admin
-      ME_CONFIG_BASICAUTH_USERNAME: ${MONGO_EXPRESS_USERNAME}
-      ME_CONFIG_BASICAUTH_PASSWORD: ${MONGO_EXPRESS_PASSWORD}
-    networks:
-      - mongodb_network
-      - caddy
-    deploy:
-      replicas: 1
-      restart_policy:
-        condition: on-failure
-    labels:
-      caddy: "${DOMAIN}"
-      caddy.reverse_proxy: "{{upstreams 8081}}"
-      caddy.tls: "${CADDY_EMAIL}"
-
 volumes:
   mongodb_data:
     driver: local
@@ -44,6 +28,4 @@ volumes:
 networks:
   mongodb_network:
     driver: overlay
-    attachable: true
-  caddy:
-    external: true 
+    attachable: true 
