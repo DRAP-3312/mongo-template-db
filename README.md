@@ -1,61 +1,75 @@
 # MongoDB Template DB - Docker Swarm Deployment
 
-Configuración mínima para desplegar MongoDB en un servidor VPS usando Docker Swarm y Caddy.
+Configuración para desplegar una base de datos MongoDB con una interfaz web (`mongo-express`) en un servidor VPS usando Docker Swarm, Caddy y CI/CD automático.
 
 ## 🚀 Características
 
-- **MongoDB 7.0** con configuración básica
-- **Docker Swarm** para orquestación
-- **CI/CD automático** con GitHub Actions
-- **Configuración automática de Caddy** mediante labels
+- **MongoDB 7.0**: Base de datos NoSQL.
+- **Mongo-Express**: Interfaz de administración web para MongoDB.
+- **Docker Swarm**: Orquestación de contenedores.
+- **CI/CD automático**: Despliegue continuo con GitHub Actions.
+- **Caddy Server**: Proxy reverso automático con HTTPS.
 
 ## 📋 Prerrequisitos
 
-- Servidor VPS con Docker Swarm configurado
-- Caddy configurado con Docker Swarm labels
-- Acceso SSH al servidor
-- Dominio configurado para Caddy
+- Servidor VPS con Docker y Docker Swarm inicializado.
+- Un dominio apuntando a la IP de tu VPS.
+- Caddy configurado para funcionar con Docker Swarm labels.
+- Acceso SSH a tu servidor.
 
 ## 🛠️ Configuración
 
 ### 1. Configurar GitHub Secrets
 
-Configura los siguientes secrets en tu repositorio de GitHub:
+Ve a `Settings > Secrets and variables > Actions` en tu repositorio y añade los siguientes secrets:
 
-- `SSH_PRIVATE_KEY`: Tu clave SSH privada
-- `VPS_HOST`: IP o dominio de tu servidor
-- `VPS_USER`: Usuario SSH del servidor
-- `MONGO_ROOT_USERNAME`: Usuario root de MongoDB
-- `MONGO_ROOT_PASSWORD`: Contraseña root de MongoDB
-- `MONGO_DATABASE`: Nombre de la base de datos
-- `DOMAIN`: Tu dominio principal (ej: saguarodrap.dev)
-- `CADDY_EMAIL`: Email para certificados SSL
+**Conexión SSH:**
+- `SSH_PRIVATE_KEY`: Tu clave SSH privada para acceder al VPS.
+- `VPS_HOST`: La IP o dominio de tu VPS.
+- `VPS_USER`: El usuario SSH para tu VPS.
+
+**Base de Datos (MongoDB):**
+- `MONGO_ROOT_USERNAME`: El usuario administrador para la base de datos.
+- `MONGO_ROOT_PASSWORD`: La contraseña para el usuario administrador de la DB.
+- `MONGO_DATABASE`: El nombre de la base de datos a crear.
+
+**Interfaz Web (Mongo-Express):**
+- `MONGO_EXPRESS_USERNAME`: El usuario para acceder a la interfaz web.
+- `MONGO_EXPRESS_PASSWORD`: La contraseña para la interfaz web.
+
+**Dominio (Caddy):**
+- `DOMAIN`: Tu dominio base (ej. `saguarodrap.dev`).
+- `CADDY_EMAIL`: Tu email para generar los certificados SSL.
 
 ## 🚀 Despliegue
 
-El despliegue automático se activa al hacer push a la rama `main` o `master`.
+1.  Asegúrate de haber configurado todos los secrets.
+2.  Haz `git push` a la rama `main`.
 
-### Flujo de despliegue:
-1. **GitHub Actions** copia el archivo de configuración al servidor
-2. **Docker Swarm** despliega MongoDB
-3. **Caddy** detecta automáticamente los labels y configura el proxy reverso
-4. **MongoDB** estará disponible en `db.tu-dominio.com:27017`
+El workflow de GitHub Actions se activará, construirá la configuración en tu VPS y desplegará los servicios.
 
-## 🔧 Configuración
+### ¿Qué ocurre durante el despliegue?
+1.  **GitHub Actions** se conecta a tu VPS.
+2.  Copia el archivo `deploy-stack.yml`.
+3.  Crea un archivo `.env` con los valores de tus secrets.
+4.  **Docker Swarm** lee la configuración y levanta los servicios `mongodb` y `mongo-express`.
+5.  **Caddy** detecta las `labels` del servicio `mongo-express` y automáticamente configura un proxy reverso con HTTPS.
 
-### Variables de Entorno
+## 🌐 Acceso
 
-| Variable | Descripción |
-|----------|-------------|
-| `MONGO_ROOT_USERNAME` | Usuario root de MongoDB |
-| `MONGO_ROOT_PASSWORD` | Contraseña root de MongoDB |
-| `MONGO_DATABASE` | Base de datos inicial |
-| `DOMAIN` | Dominio principal |
-| `CADDY_EMAIL` | Email para SSL |
+-   **Interfaz Web**: Podrás acceder a través de `https://db.TU_DOMINIO` (ej. `https://db.saguarodrap.dev`). Usa las credenciales de `MONGO_EXPRESS_USERNAME` y `MONGO_EXPRESS_PASSWORD` para entrar.
+-   **Base de Datos**: La base de datos **no está expuesta directamente a internet**. Solo es accesible desde otros contenedores dentro de la misma red de Docker, como `mongo-express` o tus propias aplicaciones si las conectas a la red `mongodb_network`.
 
-### Acceso
+## 📝 Estructura del Proyecto
 
-- **MongoDB**: `mongodb://usuario:password@db.tu-dominio.com:27017/tu_database`
+```
+.
+├── .deploy/
+│   └── deploy-stack.yml  # Define los servicios mongodb y mongo-express
+└── .github/
+    └── workflows/
+        └── deploy.yml      # Workflow de despliegue automático
+```
 
 ## 📊 Monitoreo
 
@@ -87,17 +101,6 @@ async function connect() {
         console.error("Error de conexión:", error);
     }
 }
-```
-
-## 📝 Estructura del Proyecto
-
-```
-mongo-template-db/
-├── .deploy/
-│   └── deploy-stack.yml          # Stack de Docker Swarm
-├── .github/workflows/
-│   └── deploy.yml                # Workflow de GitHub Actions
-└── README.md                     # Documentación
 ```
 
 ## 🛠️ Mantenimiento

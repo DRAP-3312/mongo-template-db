@@ -49,6 +49,8 @@ jobs:
           MONGO_ROOT_USERNAME=${{ secrets.MONGO_ROOT_USERNAME }}
           MONGO_ROOT_PASSWORD=${{ secrets.MONGO_ROOT_PASSWORD }}
           MONGO_DATABASE=${{ secrets.MONGO_DATABASE }}
+          MONGO_EXPRESS_USERNAME=${{ secrets.MONGO_EXPRESS_USERNAME }}
+          MONGO_EXPRESS_PASSWORD=${{ secrets.MONGO_EXPRESS_PASSWORD }}
           DOMAIN=${{ secrets.DOMAIN }}
           CADDY_EMAIL=${{ secrets.CADDY_EMAIL }}
           ENVEOF

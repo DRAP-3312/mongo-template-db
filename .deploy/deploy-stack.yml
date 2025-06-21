@@ -10,7 +10,7 @@ services:
     volumes:
       - mongodb_data:/data/db
     networks:
-      - caddy
+      - mongodb_network
     deploy:
       replicas: 1
       resources:
@@ -18,9 +18,23 @@ services:
           memory: 1G
         reservations:
           memory: 512M
+
+  mongo-express:
+    image: mongo-express:latest
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_ROOT_USERNAME}
+      ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_ROOT_PASSWORD}
+      ME_CONFIG_MONGODB_URL: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongodb:27017/
+      ME_CONFIG_BASICAUTH_USERNAME: ${MONGO_EXPRESS_USERNAME}
+      ME_CONFIG_BASICAUTH_PASSWORD: ${MONGO_EXPRESS_PASSWORD}
+    networks:
+      - mongodb_network
+      - caddy
+    deploy:
+      replicas: 1
       labels:
         caddy: "db.${DOMAIN}"
-        caddy.reverse_proxy: "{{upstreams 27017}}"
+        caddy.reverse_proxy: "{{upstreams 8081}}"
         caddy.tls: "${CADDY_EMAIL}"
 
 volumes:
@@ -28,5 +42,8 @@ volumes:
     driver: local
 
 networks:
+  mongodb_network:
+    driver: overlay
+    attachable: true
   caddy:
     external: true 
