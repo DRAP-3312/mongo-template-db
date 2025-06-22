@@ -8,14 +8,12 @@ services:
     volumes:
       - mongodb_data:/data/db
       - ./certs:/etc/ssl/mongo
+      - ./mongod.conf:/etc/mongod.conf
     ports:
       - "27017:27017"
     networks:
       - caddy
-    command: >
-      mongod --bind_ip_all 
-      --tlsMode requireTLS 
-      --tlsCertificateKeyFile /etc/ssl/mongo/server.pem
+    command: mongod --config /etc/mongod.conf
     deploy:
       replicas: 1
       resources:

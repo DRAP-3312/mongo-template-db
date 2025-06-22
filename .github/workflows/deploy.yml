@@ -26,6 +26,15 @@ jobs:
         ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
         chmod 600 ~/.ssh/known_hosts
 
+    - name: Copy deploy-stack.yml to VPS
+      uses: appleboy/scp-action@v0.1.6
+      with:
+        host: ${{ secrets.VPS_HOST }}
+        username: ${{ secrets.VPS_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        source: ".deploy/deploy-stack.yml"
+        target: "/home/${{ secrets.VPS_USER }}/workspace/mongo-template-db/.deploy/"
+
     - name: Deploy to VPS
       uses: appleboy/ssh-action@v1.0.0
       with:
@@ -34,6 +43,24 @@ jobs:
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         script: |
           cd /home/${{ secrets.VPS_USER }}/workspace/mongo-template-db
+
+          # Create mongod.conf
+          cat > mongod.conf << 'MONGOEOF'
+          net:
+            port: 27017
+            bindIpAll: true
+            tls:
+              mode: requireTLS
+              certificateKeyFile: /etc/ssl/mongo/server.pem
+          storage:
+            dbPath: /data/db
+          journal:
+            enabled: true
+          systemLog:
+            destination: file
+            path: /data/db/mongod.log
+            logAppend: true
+          MONGOEOF
 
           # Create certificate directory
           mkdir -p certs
@@ -44,11 +71,11 @@ jobs:
             openssl req -x509 -newkey rsa:4096 -sha256 -days 3650 -nodes \
               -keyout certs/server.pem -out certs/server.pem \
               -subj "/C=US/ST=CA/L=SF/O=MyOrg/OU=Dev/CN=${{ secrets.DOMAIN }}"
-            
-            echo ">>> Setting permissions for certificate..."
-            chmod 755 certs
-            chmod 644 certs/server.pem
           fi
+            
+          echo ">>> Setting permissions for certificate..."
+          chmod 755 certs
+          chmod 644 certs/server.pem
 
           # Create .env file from secrets
           cat > .env << 'ENVEOF'
