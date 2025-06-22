@@ -44,6 +44,43 @@ jobs:
           # Create .deploy directory if it doesn't exist
           mkdir -p .deploy
 
+          # Create certificate directory
+          mkdir -p certs
+
+          # Generate CA and server certificates if they don't exist
+          if [ ! -f "certs/ca.pem" ]; then
+            echo ">>> Generating CA and server certificates..."
+            
+            # Generate CA private key
+            openssl genrsa -out certs/ca.key 4096
+            
+            # Generate CA certificate
+            openssl req -new -x509 -days 3650 -key certs/ca.key -out certs/ca.pem \
+              -subj "/C=US/ST=CA/L=SF/O=MyOrg/OU=Dev/CN=MongoDB-CA"
+            
+            # Generate server private key
+            openssl genrsa -out certs/server.key 4096
+            
+            # Create server certificate signing request
+            openssl req -new -key certs/server.key -out certs/server.csr \
+              -subj "/C=US/ST=CA/L=SF/O=MyOrg/OU=Dev/CN=${{ secrets.DOMAIN }}"
+            
+            # Sign server certificate with CA
+            openssl x509 -req -in certs/server.csr -CA certs/ca.pem -CAkey certs/ca.key \
+              -CAcreateserial -out certs/server.crt -days 3650
+            
+            # Combine server certificate and key
+            cat certs/server.crt certs/server.key > certs/server.pem
+            
+            # Clean up intermediate files
+            rm certs/server.csr certs/server.crt certs/server.key
+          fi
+            
+          echo ">>> Setting permissions for certificates..."
+          chmod 755 certs
+          chmod 644 certs/*.pem
+          chmod 600 certs/ca.key
+
           # Create mongod.conf
           cat > mongod.conf << 'MONGOEOF'
           net:
@@ -52,6 +89,7 @@ jobs:
             tls:
               mode: requireTLS
               certificateKeyFile: /etc/ssl/mongo/server.pem
+              CAFile: /etc/ssl/mongo/ca.pem
           storage:
             dbPath: /data/db
           systemLog:
@@ -59,21 +97,6 @@ jobs:
             path: /data/db/mongod.log
             logAppend: true
           MONGOEOF
-
-          # Create certificate directory
-          mkdir -p certs
-
-          # Generate self-signed certificate if it doesn't exist
-          if [ ! -f "certs/server.pem" ]; then
-            echo ">>> Generating self-signed TLS certificate..."
-            openssl req -x509 -newkey rsa:4096 -sha256 -days 3650 -nodes \
-              -keyout certs/server.pem -out certs/server.pem \
-              -subj "/C=US/ST=CA/L=SF/O=MyOrg/OU=Dev/CN=${{ secrets.DOMAIN }}"
-          fi
-            
-          echo ">>> Setting permissions for certificate..."
-          chmod 755 certs
-          chmod 644 certs/server.pem
 
           # Create .env file from secrets
           cat > .env << 'ENVEOF'
