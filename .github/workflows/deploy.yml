@@ -33,7 +33,7 @@ jobs:
         username: ${{ secrets.VPS_USER }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         source: ".deploy/deploy-stack.yml"
-        target: "/home/${{ secrets.VPS_USER }}/workspace/mongo-template-db/deploy-stack.yml"
+        target: "/home/${{ secrets.VPS_USER }}/workspace/mongo-template-db/"
 
     - name: Deploy to VPS
       uses: appleboy/ssh-action@v1.0.0
@@ -53,6 +53,9 @@ jobs:
           CADDY_EMAIL=${{ secrets.CADDY_EMAIL }}
           ENVEOF
 
+          echo ">>> Verificando archivo deploy-stack.yml..."
+          ls -la deploy-stack.yml
+          
           echo ">>> Removing old stack if exists..."
           docker stack rm mongodb || true
           sleep 10
