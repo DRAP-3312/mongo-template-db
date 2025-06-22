@@ -33,7 +33,7 @@ jobs:
         username: ${{ secrets.VPS_USER }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         source: ".deploy/deploy-stack.yml"
-        target: "/home/${{ secrets.VPS_USER }}/workspace/mongo-template-db/"
+        target: "/home/${{ secrets.VPS_USER }}/workspace/mongo-template-db/deploy-stack.yml"
 
     - name: Deploy to VPS
       uses: appleboy/ssh-action@v1.0.0
@@ -53,13 +53,20 @@ jobs:
           CADDY_EMAIL=${{ secrets.CADDY_EMAIL }}
           ENVEOF
 
+          echo ">>> Removing old stack if exists..."
+          docker stack rm mongodb || true
+          sleep 10
+
           echo ">>> Deploying MongoDB stack..."
           docker stack deploy -c deploy-stack.yml mongodb
 
-          echo ">>> Waiting for service update (10 seconds)..."
-          sleep 10
+          echo ">>> Waiting for service update (15 seconds)..."
+          sleep 15
 
           echo ">>> Checking service status..."
-          docker service ls | grep mongodb
+          docker service ls | grep mongodb || echo "No mongodb service found"
 
-          echo ">>> MongoDB deployment completed successfully!"
+          echo ">>> Checking stack services..."
+          docker stack services mongodb
+
+          echo ">>> MongoDB deployment completed!"

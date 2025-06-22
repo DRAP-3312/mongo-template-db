@@ -7,6 +7,8 @@ services:
       MONGO_INITDB_DATABASE: ${MONGO_DATABASE}
     volumes:
       - mongodb_data:/data/db
+    ports:
+      - "27017:27017"
     networks:
       - caddy
     deploy:
@@ -18,7 +20,7 @@ services:
           memory: 512M
       labels:
         caddy: "${DOMAIN}"
-        caddy.reverse_proxy: "{{upstreams 27017}}"
+        caddy.reverse_proxy: "mongodb:27017"
         caddy.tls: "${CADDY_EMAIL}"
 
 volumes:
