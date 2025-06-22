@@ -70,8 +70,6 @@ jobs:
               CAFile: /etc/ssl/mongo/ca.pem
           storage:
             dbPath: /data/db
-          systemLog:
-            destination: stdout
           setParameter:
             tlsCipherSuite: "TLS_AES_256_GCM_SHA384"
           EOF
