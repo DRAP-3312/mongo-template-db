@@ -26,15 +26,6 @@ jobs:
         ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
         chmod 600 ~/.ssh/known_hosts
 
-    - name: Copy deploy-stack.yml to VPS
-      uses: appleboy/scp-action@v0.1.6
-      with:
-        host: ${{ secrets.VPS_HOST }}
-        username: ${{ secrets.VPS_USER }}
-        key: ${{ secrets.SSH_PRIVATE_KEY }}
-        source: ".deploy/deploy-stack.yml"
-        target: "/home/${{ secrets.VPS_USER }}/workspace/mongo-template-db/.deploy/"
-
     - name: Deploy to VPS
       uses: appleboy/ssh-action@v1.0.0
       with:
@@ -44,6 +35,10 @@ jobs:
         script: |
           cd /home/${{ secrets.VPS_USER }}/workspace/mongo-template-db
 
+          # Clean up duplicate .deploy directories
+          echo ">>> Cleaning up duplicate directories..."
+          rm -rf .deploy/.deploy
+          
           # Create mongod.conf
           cat > mongod.conf << 'MONGOEOF'
           net:
@@ -85,6 +80,41 @@ jobs:
           DOMAIN=${{ secrets.DOMAIN }}
           CADDY_EMAIL=${{ secrets.CADDY_EMAIL }}
           ENVEOF
+
+          # Create deploy-stack.yml with absolute paths
+          cat > .deploy/deploy-stack.yml << 'STACKEOF'
+          services:
+            mongodb:
+              image: mongo:7.0
+              environment:
+                MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
+                MONGO_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+                MONGO_INITDB_DATABASE: ${MONGO_DATABASE}
+              volumes:
+                - mongodb_data:/data/db
+                - /home/${{ secrets.VPS_USER }}/workspace/mongo-template-db/certs:/etc/ssl/mongo
+                - /home/${{ secrets.VPS_USER }}/workspace/mongo-template-db/mongod.conf:/etc/mongod.conf
+              ports:
+                - "27017:27017"
+              networks:
+                - caddy
+              command: mongod --config /etc/mongod.conf
+              deploy:
+                replicas: 1
+                resources:
+                  limits:
+                    memory: 1G
+                  reservations:
+                    memory: 512M
+
+          volumes:
+            mongodb_data:
+              driver: local
+
+          networks:
+            caddy:
+              external: true
+          STACKEOF
 
           echo ">>> Removing old stack if exists..."
           docker stack rm mongodb || true
