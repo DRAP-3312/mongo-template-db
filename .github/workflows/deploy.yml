@@ -54,9 +54,10 @@ jobs:
           cat certs/server.crt certs/server.key > certs/server.pem
 
           # Set permissions
-          chmod -R 644 certs
-          chmod 600 certs/ca.key
-          chmod 600 certs/server.key
+          sudo chmod -R 644 certs
+          sudo chmod 755 certs
+          sudo chmod 600 certs/ca.key
+          sudo chmod 600 certs/server.key
 
           # Create mongod.conf
           cat << EOF > mongod.conf
@@ -77,6 +78,9 @@ jobs:
             destination: stdout
           EOF
           
+          # Create .deploy directory
+          mkdir -p .deploy
+
           # Create deploy-stack.yml with absolute paths
           cat << EOF > .deploy/deploy-stack.yml
           services:
