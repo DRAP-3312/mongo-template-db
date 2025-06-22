@@ -33,93 +33,63 @@ jobs:
         username: ${{ secrets.VPS_USER }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         script: |
-          # Create directory if it doesn't exist
-          mkdir -p /home/${{ secrets.VPS_USER }}/workspace/mongo-template-db
-          cd /home/${{ secrets.VPS_USER }}/workspace/mongo-template-db
-
-          # Clean up duplicate .deploy directories
-          echo ">>> Cleaning up duplicate directories..."
-          rm -rf .deploy/.deploy
-          
-          # Create .deploy directory if it doesn't exist
-          mkdir -p .deploy
+          # Create project directory
+          export DEPLOY_DIR="/home/${{ secrets.VPS_USER }}/workspace/mongo-template-db"
+          mkdir -p $DEPLOY_DIR
+          cd $DEPLOY_DIR
 
           # Create certificate directory
           mkdir -p certs
+          
+          # Generate CA
+          openssl genrsa -out certs/ca.key 4096
+          openssl req -new -x509 -days 365 -key certs/ca.key -out certs/ca.pem -subj "/CN=MongoDB-CA"
 
-          # Generate CA and server certificates if they don't exist
-          if [ ! -f "certs/ca.pem" ]; then
-            echo ">>> Generating CA and server certificates..."
-            
-            # Generate CA private key
-            openssl genrsa -out certs/ca.key 4096
-            
-            # Generate CA certificate
-            openssl req -new -x509 -days 3650 -key certs/ca.key -out certs/ca.pem \
-              -subj "/C=US/ST=CA/L=SF/O=MyOrg/OU=Dev/CN=MongoDB-CA"
-            
-            # Generate server private key
-            openssl genrsa -out certs/server.key 4096
-            
-            # Create server certificate signing request
-            openssl req -new -key certs/server.key -out certs/server.csr \
-              -subj "/C=US/ST=CA/L=SF/O=MyOrg/OU=Dev/CN=${{ secrets.DOMAIN }}"
-            
-            # Sign server certificate with CA
-            openssl x509 -req -in certs/server.csr -CA certs/ca.pem -CAkey certs/ca.key \
-              -CAcreateserial -out certs/server.crt -days 3650
-            
-            # Combine server certificate and key
-            cat certs/server.crt certs/server.key > certs/server.pem
-            
-            # Clean up intermediate files
-            rm certs/server.csr certs/server.crt certs/server.key
-          fi
-            
-          echo ">>> Setting permissions for certificates..."
-          chmod 755 certs
-          chmod 644 certs/*.pem
+          # Generate Server Certificate
+          openssl genrsa -out certs/server.key 4096
+          openssl req -new -key certs/server.key -out certs/server.csr -subj "/CN=${{ secrets.DOMAIN }}"
+          openssl x509 -req -days 365 -in certs/server.csr -CA certs/ca.pem -CAkey certs/ca.key -CAcreateserial -out certs/server.crt
+          
+          # Combine server key and cert for MongoDB
+          cat certs/server.crt certs/server.key > certs/server.pem
+
+          # Set permissions
+          chmod -R 644 certs
           chmod 600 certs/ca.key
+          chmod 600 certs/server.key
 
           # Create mongod.conf
-          cat > mongod.conf << 'MONGOEOF'
+          cat << EOF > mongod.conf
           net:
             port: 27017
-            bindIpAll: true
+            bindIp: 0.0.0.0
             tls:
               mode: requireTLS
               certificateKeyFile: /etc/ssl/mongo/server.pem
               CAFile: /etc/ssl/mongo/ca.pem
+              setParameter:
+                tlsCipherSuite: "TLS_AES_256_GCM_SHA384"
           storage:
             dbPath: /data/db
+            journal:
+              enabled: true
           systemLog:
-            destination: file
-            path: /data/db/mongod.log
-            logAppend: true
-          MONGOEOF
-
-          # Create .env file from secrets
-          cat > .env << 'ENVEOF'
-          MONGO_ROOT_USERNAME=${{ secrets.MONGO_ROOT_USERNAME }}
-          MONGO_ROOT_PASSWORD=${{ secrets.MONGO_ROOT_PASSWORD }}
-          MONGO_DATABASE=${{ secrets.MONGO_DATABASE }}
-          DOMAIN=${{ secrets.DOMAIN }}
-          CADDY_EMAIL=${{ secrets.CADDY_EMAIL }}
-          ENVEOF
-
+            destination: stdout
+          EOF
+          
           # Create deploy-stack.yml with absolute paths
-          cat > .deploy/deploy-stack.yml << 'STACKEOF'
+          cat << EOF > .deploy/deploy-stack.yml
           services:
             mongodb:
               image: mongo:7.0
               environment:
-                MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
-                MONGO_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
-                MONGO_INITDB_DATABASE: ${MONGO_DATABASE}
+                MONGO_INITDB_ROOT_USERNAME: \${MONGO_ROOT_USERNAME}
+                MONGO_INITDB_ROOT_PASSWORD: \${MONGO_ROOT_PASSWORD}
+                MONGO_INITDB_DATABASE: \${MONGO_DATABASE}
               volumes:
+                - ${DEPLOY_DIR}/certs:/etc/ssl/mongo
+                - ${DEPLOY_DIR}/mongod.conf:/etc/mongod.conf
                 - mongodb_data:/data/db
-                - /home/${{ secrets.VPS_USER }}/workspace/mongo-template-db/certs:/etc/ssl/mongo
-                - /home/${{ secrets.VPS_USER }}/workspace/mongo-template-db/mongod.conf:/etc/mongod.conf
               ports:
                 - "27017:27017"
               networks:
@@ -132,30 +102,28 @@ jobs:
                     memory: 1G
                   reservations:
                     memory: 512M
-
           volumes:
             mongodb_data:
               driver: local
-
           networks:
             caddy:
               external: true
-          STACKEOF
+          EOF
 
-          echo ">>> Removing old stack if exists..."
-          docker stack rm mongodb || true
+          echo ">>> Removing previous stack..."
+          docker stack rm mongodb 2>/dev/null || true
           sleep 10
-
-          echo ">>> Deploying MongoDB stack..."
+          
+          echo ">>> Deploying MongoDB Stack..."
           docker stack deploy -c .deploy/deploy-stack.yml mongodb
-
-          echo ">>> Waiting for service update (20 seconds)..."
+          
+          echo ">>> Waiting for service to start (20 seconds)..."
           sleep 20
-
+          
           echo ">>> Checking service status..."
-          docker service ls | grep mongodb || echo "No mongodb service found"
-
-          echo ">>> Checking MongoDB service logs..."
-          docker service logs mongodb_mongodb --tail 50 || echo "Could not retrieve logs for service."
+          docker service ls
+          
+          echo ">>> Displaying service logs..."
+          docker service logs mongodb_mongodb || echo "Could not retrieve logs, service might be starting."
 
           echo ">>> MongoDB deployment completed!"
