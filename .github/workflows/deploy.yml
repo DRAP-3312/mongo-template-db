@@ -68,14 +68,14 @@ jobs:
               mode: requireTLS
               certificateKeyFile: /etc/ssl/mongo/server.pem
               CAFile: /etc/ssl/mongo/ca.pem
-              setParameter:
-                tlsCipherSuite: "TLS_AES_256_GCM_SHA384"
           storage:
             dbPath: /data/db
             journal:
               enabled: true
           systemLog:
             destination: stdout
+          setParameter:
+            tlsCipherSuite: "TLS_AES_256_GCM_SHA384"
           EOF
           
           # Create .deploy directory
