@@ -70,8 +70,6 @@ jobs:
               CAFile: /etc/ssl/mongo/ca.pem
           storage:
             dbPath: /data/db
-            journal:
-              enabled: true
           systemLog:
             destination: stdout
           setParameter:
