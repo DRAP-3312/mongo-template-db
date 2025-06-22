@@ -33,12 +33,17 @@ jobs:
         username: ${{ secrets.VPS_USER }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         script: |
+          # Create directory if it doesn't exist
+          mkdir -p /home/${{ secrets.VPS_USER }}/workspace/mongo-template-db
           cd /home/${{ secrets.VPS_USER }}/workspace/mongo-template-db
 
           # Clean up duplicate .deploy directories
           echo ">>> Cleaning up duplicate directories..."
           rm -rf .deploy/.deploy
           
+          # Create .deploy directory if it doesn't exist
+          mkdir -p .deploy
+
           # Create mongod.conf
           cat > mongod.conf << 'MONGOEOF'
           net:
