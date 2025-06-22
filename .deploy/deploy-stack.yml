@@ -17,7 +17,7 @@ services:
         reservations:
           memory: 512M
       labels:
-        caddy: "db.${DOMAIN}"
+        caddy: "${DOMAIN}"
         caddy.reverse_proxy: "{{upstreams 27017}}"
         caddy.tls: "${CADDY_EMAIL}"
 
