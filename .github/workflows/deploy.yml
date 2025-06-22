@@ -54,8 +54,6 @@ jobs:
               certificateKeyFile: /etc/ssl/mongo/server.pem
           storage:
             dbPath: /data/db
-          journal:
-            enabled: true
           systemLog:
             destination: file
             path: /data/db/mongod.log
