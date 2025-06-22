@@ -1,20 +1,14 @@
-version: '3.8'
-
 services:
   mongodb:
     image: mongo:7.0
-    ports:
-      - "27017:27017"
-    volumes:
-      - /tmp/mongodb.pem:/etc/ssl/mongodb.pem:ro
-      - mongodb_data:/data/db
-    command: mongod --bind_ip_all --tlsMode requireTLS --tlsCertificateKeyFile /etc/ssl/mongodb.pem
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
       MONGO_INITDB_DATABASE: ${MONGO_DATABASE}
+    volumes:
+      - mongodb_data:/data/db
     networks:
-      - mongodb_network
+      - caddy
     deploy:
       replicas: 1
       resources:
@@ -22,12 +16,15 @@ services:
           memory: 1G
         reservations:
           memory: 512M
+      labels:
+        caddy: "db.${DOMAIN}"
+        caddy.reverse_proxy: "{{upstreams 27017}}"
+        caddy.tls: "${CADDY_EMAIL}"
 
 volumes:
   mongodb_data:
     driver: local
 
 networks:
-  mongodb_network:
-    driver: overlay
-    attachable: true 
+  caddy:
+    external: true

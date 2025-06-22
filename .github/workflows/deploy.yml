@@ -1,80 +1,65 @@
-name: Deploy to VPS
+name: Deploy MongoDB to VPS
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
   workflow_dispatch:
-    inputs:
-      branch:
-        description: 'Branch to deploy'
-        required: true
-        default: 'main'
-        type: string
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.inputs.branch || github.ref }}
+    - name: Checkout Repository
+      uses: actions/checkout@v4
 
-      - name: Deploy to VPS
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            set -e
-            
-            BRANCH_TO_DEPLOY=${{ github.event.inputs.branch || github.ref_name }}
+    - name: Install SSH Key
+      uses: webfactory/ssh-agent@v0.9.0
+      with:
+        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-            # Define project and repo details
-            WORKSPACE_DIR=~/workspace
-            PROJECT_DIR=$WORKSPACE_DIR/mongo-template-db
-            REPO_URL=https://github.com/DRAP-3312/mongo-template-db.git
-            
-            # Ensure workspace directory exists
-            mkdir -p $WORKSPACE_DIR
-            cd $WORKSPACE_DIR
-            
-            # Clone if project doesn't exist, or pull if it does
-            if [ -d "$PROJECT_DIR/.git" ]; then
-              echo "Repository exists, fetching and resetting to branch ${BRANCH_TO_DEPLOY}."
-              cd $PROJECT_DIR
-              git fetch origin
-              git checkout ${BRANCH_TO_DEPLOY}
-              git reset --hard origin/${BRANCH_TO_DEPLOY}
-            else
-              echo "Repository not found, cloning branch ${BRANCH_TO_DEPLOY}."
-              rm -rf $PROJECT_DIR
-              git clone -b ${BRANCH_TO_DEPLOY} ${REPO_URL} ${PROJECT_DIR}
-              cd $PROJECT_DIR
-            fi
-            
-            # Prepare combined certificate for MongoDB TLS from Caddy's certs
-            # This assumes Caddy is storing certs in the default location.
-            echo "Preparing MongoDB TLS certificate from Caddy..."
-            CADDY_CERT_PATH="/var/lib/caddy/.local/share/caddy/certificates/acme-v02.api.letsencrypt.org-directory/${DOMAIN}"
-            MONGO_CERT_TEMP_PATH="/tmp/mongodb.pem"
-            sudo cat "${CADDY_CERT_PATH}/${DOMAIN}.crt" "${CADDY_CERT_PATH}/${DOMAIN}.key" > $MONGO_CERT_TEMP_PATH
-            
-            # Create .env file from secrets on the server
-            cat << EOF > .env
-            MONGO_ROOT_USERNAME=${{ secrets.MONGO_ROOT_USERNAME }}
-            MONGO_ROOT_PASSWORD=${{ secrets.MONGO_ROOT_PASSWORD }}
-            MONGO_DATABASE=${{ secrets.MONGO_DATABASE }}
-            DOMAIN=${{ secrets.DOMAIN }}
-            CADDY_EMAIL=${{ secrets.CADDY_EMAIL }}
-            MONGO_EXPRESS_USERNAME=${{ secrets.MONGO_EXPRESS_USERNAME }}
-            MONGO_EXPRESS_PASSWORD=${{ secrets.MONGO_EXPRESS_PASSWORD }}
-            EOF
-            
-            # Load .env variables and deploy
-            set -a
-            source .env
-            set +a
-            docker stack deploy --compose-file .deploy/deploy-stack.yml mongodb --with-registry-auth
+    - name: Add VPS to known_hosts
+      run: |
+        mkdir -p ~/.ssh
+        ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
+        chmod 600 ~/.ssh/known_hosts
+
+    - name: Copy deploy-stack.yml to VPS
+      uses: appleboy/scp-action@v0.1.6
+      with:
+        host: ${{ secrets.VPS_HOST }}
+        username: ${{ secrets.VPS_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        source: ".deploy/deploy-stack.yml"
+        target: "/home/${{ secrets.VPS_USER }}/workspace/mongo-template-db/"
+
+    - name: Deploy to VPS
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.VPS_HOST }}
+        username: ${{ secrets.VPS_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        script: |
+          cd /home/${{ secrets.VPS_USER }}/workspace/mongo-template-db
+
+          # Create .env file from secrets
+          cat > .env << 'ENVEOF'
+          MONGO_ROOT_USERNAME=${{ secrets.MONGO_ROOT_USERNAME }}
+          MONGO_ROOT_PASSWORD=${{ secrets.MONGO_ROOT_PASSWORD }}
+          MONGO_DATABASE=${{ secrets.MONGO_DATABASE }}
+          DOMAIN=${{ secrets.DOMAIN }}
+          CADDY_EMAIL=${{ secrets.CADDY_EMAIL }}
+          ENVEOF
+
+          echo ">>> Deploying MongoDB stack..."
+          docker stack deploy -c deploy-stack.yml mongodb
+
+          echo ">>> Waiting for service update (10 seconds)..."
+          sleep 10
+
+          echo ">>> Checking service status..."
+          docker service ls | grep mongodb
+
+          echo ">>> MongoDB deployment completed successfully!"
