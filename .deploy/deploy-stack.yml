@@ -7,10 +7,15 @@ services:
       MONGO_INITDB_DATABASE: ${MONGO_DATABASE}
     volumes:
       - mongodb_data:/data/db
+      - ./certs:/etc/ssl/mongo
     ports:
       - "27017:27017"
     networks:
       - caddy
+    command: >
+      mongod --bind_ip_all 
+      --tlsMode requireTLS 
+      --tlsCertificateKeyFile /etc/ssl/mongo/server.pem
     deploy:
       replicas: 1
       resources:
@@ -18,10 +23,6 @@ services:
           memory: 1G
         reservations:
           memory: 512M
-      labels:
-        caddy: "${DOMAIN}"
-        caddy.reverse_proxy: "mongodb:27017"
-        caddy.tls: "${CADDY_EMAIL}"
 
 volumes:
   mongodb_data:
