@@ -26,15 +26,6 @@ jobs:
         ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
         chmod 600 ~/.ssh/known_hosts
 
-    - name: Copy deploy-stack.yml to VPS
-      uses: appleboy/scp-action@v0.1.6
-      with:
-        host: ${{ secrets.VPS_HOST }}
-        username: ${{ secrets.VPS_USER }}
-        key: ${{ secrets.SSH_PRIVATE_KEY }}
-        source: ".deploy/deploy-stack.yml"
-        target: "/home/${{ secrets.VPS_USER }}/workspace/mongo-template-db/"
-
     - name: Deploy to VPS
       uses: appleboy/ssh-action@v1.0.0
       with:
@@ -54,14 +45,14 @@ jobs:
           ENVEOF
 
           echo ">>> Verificando archivo deploy-stack.yml..."
-          ls -la deploy-stack.yml
+          ls -la .deploy/deploy-stack.yml
           
           echo ">>> Removing old stack if exists..."
           docker stack rm mongodb || true
           sleep 10
 
           echo ">>> Deploying MongoDB stack..."
-          docker stack deploy -c deploy-stack.yml mongodb
+          docker stack deploy -c .deploy/deploy-stack.yml mongodb
 
           echo ">>> Waiting for service update (15 seconds)..."
           sleep 15
