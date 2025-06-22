@@ -44,6 +44,10 @@ jobs:
             openssl req -x509 -newkey rsa:4096 -sha256 -days 3650 -nodes \
               -keyout certs/server.pem -out certs/server.pem \
               -subj "/C=US/ST=CA/L=SF/O=MyOrg/OU=Dev/CN=${{ secrets.DOMAIN }}"
+            
+            echo ">>> Setting permissions for certificate..."
+            chmod 755 certs
+            chmod 644 certs/server.pem
           fi
 
           # Create .env file from secrets
@@ -62,13 +66,13 @@ jobs:
           echo ">>> Deploying MongoDB stack..."
           docker stack deploy -c .deploy/deploy-stack.yml mongodb
 
-          echo ">>> Waiting for service update (15 seconds)..."
-          sleep 15
+          echo ">>> Waiting for service update (20 seconds)..."
+          sleep 20
 
           echo ">>> Checking service status..."
           docker service ls | grep mongodb || echo "No mongodb service found"
 
-          echo ">>> Checking stack services..."
-          docker stack services mongodb
+          echo ">>> Checking MongoDB service logs..."
+          docker service logs mongodb_mongodb --tail 50 || echo "Could not retrieve logs for service."
 
           echo ">>> MongoDB deployment completed!"
